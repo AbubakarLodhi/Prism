@@ -19,14 +19,17 @@ export async function POST(request: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of streamChatViaGemini(history, project)) {
-            controller.enqueue(encoder.encode(chunk));
+          for await (const event of streamChatViaGemini(history, project)) {
+            controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
           }
         } catch (error) {
           console.error("chat stream failed", error);
           controller.enqueue(
             encoder.encode(
-              error instanceof Error ? `\n\n[error: ${error.message}]` : "\n\n[error]"
+              JSON.stringify({
+                type: "text",
+                text: error instanceof Error ? `\n\n[error: ${error.message}]` : "\n\n[error]",
+              }) + "\n"
             )
           );
         } finally {
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
     });
 
     return new Response(stream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
     });
   } catch (error) {
     console.error("generate-chat failed", error);

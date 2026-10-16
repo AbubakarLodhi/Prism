@@ -1,0 +1,1 @@
+{"error":"{\"error\":{\"code\":400,\"message\":\"`enhancePrompt` isn't supported by this model. Please remove it or refer to the Gemini API documentation for supported usage.\",\"status\":\"INVALID_ARGUMENT\"}}"}

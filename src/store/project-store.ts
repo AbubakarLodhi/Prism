@@ -3,7 +3,7 @@
 import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
-import { generateScript, generateVideo, generateVoiceover } from "@/lib/api-client";
+import { generateImage, generateScript, generateVideo, generateVoiceover } from "@/lib/api-client";
 import type {
   AssetStatus,
   BrandSettings,
@@ -82,6 +82,7 @@ interface ProjectStore {
     tone: string
   ) => Promise<void>;
   generateProjectVideo: (projectId: string) => Promise<void>;
+  generateProjectImage: (projectId: string) => Promise<void>;
   generateProjectVoiceover: (projectId: string) => Promise<void>;
 }
 
@@ -120,6 +121,9 @@ function migrateProject(raw: unknown): Project {
     videoResult: p.videoResult as Project["videoResult"],
     videoStatus: (p.videoStatus as AssetStatus) ?? "idle",
     videoError: p.videoError as string | undefined,
+    imageResult: p.imageResult as Project["imageResult"],
+    imageStatus: (p.imageStatus as AssetStatus) ?? "idle",
+    imageError: p.imageError as string | undefined,
     voiceoverResult: p.voiceoverResult as Project["voiceoverResult"],
     voiceoverStatus: (p.voiceoverStatus as AssetStatus) ?? "idle",
     voiceoverError: p.voiceoverError as string | undefined,
@@ -160,6 +164,7 @@ export const useProjectStore = create<ProjectStore>()(
           prompt: "",
           durationSeconds: 6,
           videoStatus: "idle",
+          imageStatus: "idle",
           voiceoverStatus: "idle",
         };
         set((state) => ({ projects: [project, ...state.projects] }));
@@ -256,10 +261,12 @@ export const useProjectStore = create<ProjectStore>()(
         });
 
         try {
-          const sourceImage = project.references[0]?.url;
+          // Text-only: Veo's image-to-video mode anchors heavily on a source
+          // image and can largely ignore the text prompt, so we don't pass
+          // the reference image here even if one is attached to the project.
           const { url } = await generateVideo(
             project.prompt,
-            sourceImage,
+            undefined,
             project.durationSeconds
           );
 
@@ -282,6 +289,39 @@ export const useProjectStore = create<ProjectStore>()(
             videoStatus: "error",
             videoError: err instanceof Error ? err.message : "Video generation failed",
             status: "draft",
+          });
+        }
+      },
+
+      generateProjectImage: async (projectId) => {
+        const project = get().getProject(projectId);
+        if (!project || !project.prompt.trim()) return;
+
+        get().updateProject(projectId, {
+          imageStatus: "generating",
+          imageError: undefined,
+        });
+
+        try {
+          const { url } = await generateImage(project.prompt);
+
+          const result: GeneratedAsset = {
+            id: uid("asset"),
+            url,
+            type: "image",
+            prompt: project.prompt,
+            createdAt: now(),
+          };
+
+          get().updateProject(projectId, {
+            imageResult: result,
+            imageStatus: "done",
+            thumbnail: project.thumbnail ?? url,
+          });
+        } catch (err) {
+          get().updateProject(projectId, {
+            imageStatus: "error",
+            imageError: err instanceof Error ? err.message : "Image generation failed",
           });
         }
       },

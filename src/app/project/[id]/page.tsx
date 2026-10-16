@@ -8,6 +8,7 @@ import {
   ChevronRight,
   FileAudio,
   Film,
+  ImageIcon,
   Images,
   Loader2,
   Mic,
@@ -38,6 +39,7 @@ export default function ProjectWorkspacePage({
   const updateScript = useProjectStore((s) => s.updateScript);
   const setDuration = useProjectStore((s) => s.setDuration);
   const generateProjectVideo = useProjectStore((s) => s.generateProjectVideo);
+  const generateProjectImage = useProjectStore((s) => s.generateProjectImage);
   const generateProjectVoiceover = useProjectStore((s) => s.generateProjectVoiceover);
   const [refsOpen, setRefsOpen] = useState(true);
 
@@ -53,6 +55,7 @@ export default function ProjectWorkspacePage({
   }
 
   const videoGenerating = project.videoStatus === "generating";
+  const imageGenerating = project.imageStatus === "generating";
   const voiceoverGenerating = project.voiceoverStatus === "generating";
 
   return (
@@ -243,6 +246,64 @@ export default function ProjectWorkspacePage({
                     <video
                       src={project.videoResult.url}
                       controls
+                      className="aspect-video w-full rounded-lg bg-black object-contain"
+                    />
+                  ) : null}
+                </div>
+              )}
+            </section>
+
+            <section className="surface-card space-y-4 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <Label className="mb-0">Image</Label>
+                  <p className="text-xs text-[color:var(--ink-faint)]">
+                    Free alternative via Gemini (nano-banana) — good for a quick still instead of a full video.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  disabled={imageGenerating || !project.prompt.trim()}
+                  onClick={() => generateProjectImage(project.id)}
+                >
+                  {imageGenerating ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Generating…
+                    </>
+                  ) : project.imageResult ? (
+                    <>
+                      <RefreshCw className="size-3.5" />
+                      Regenerate image
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="size-3.5" />
+                      Generate image
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {project.imageStatus === "error" && project.imageError && (
+                <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <p>{project.imageError}</p>
+                </div>
+              )}
+
+              {(imageGenerating || project.imageResult) && (
+                <div className="rounded-xl border border-border bg-[color:var(--surface-2)] p-3">
+                  {imageGenerating && !project.imageResult ? (
+                    <div className="flex aspect-video items-center justify-center rounded-lg bg-[color:var(--surface)]">
+                      <Loader2 className="size-6 animate-spin text-primary" />
+                    </div>
+                  ) : project.imageResult ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={project.imageResult.url}
+                      alt={project.prompt}
                       className="aspect-video w-full rounded-lg bg-black object-contain"
                     />
                   ) : null}

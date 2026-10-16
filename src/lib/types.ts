@@ -26,7 +26,7 @@ export interface ReferenceAudio {
 export interface GeneratedAsset {
   id: string;
   url: string;
-  type: "video" | "audio";
+  type: "video" | "audio" | "image";
   prompt: string;
   createdAt: string;
 }
@@ -51,6 +51,10 @@ export interface Project {
   videoResult?: GeneratedAsset;
   videoStatus: AssetStatus;
   videoError?: string;
+
+  imageResult?: GeneratedAsset;
+  imageStatus: AssetStatus;
+  imageError?: string;
 
   voiceoverResult?: GeneratedAsset;
   voiceoverStatus: AssetStatus;

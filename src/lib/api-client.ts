@@ -64,6 +64,13 @@ export async function generateVideo(
   });
 }
 
+export async function generateImage(
+  prompt: string,
+  sourceImageUrl?: string
+): Promise<{ url: string }> {
+  return postJson<{ url: string }>("/api/generate-image", { prompt, sourceImageUrl });
+}
+
 export async function generateVoiceover(text: string): Promise<{ url: string }> {
   return postJson<{ url: string }>("/api/generate-voiceover", { text });
 }
@@ -76,14 +83,21 @@ interface ChatProjectContext {
   prompt?: string;
 }
 
+export type ChatAction = {
+  action: "generate_video" | "generate_image";
+  prompt: string;
+};
+
 /**
- * Streams a chat reply token-by-token, invoking onChunk as text arrives.
+ * Streams a chat reply token-by-token, invoking onChunk as text arrives, or
+ * onAction once if the model decided to trigger real video/image generation.
  * `history` should include the new user message as its last entry.
  */
 export async function streamChatReply(
   history: Pick<ChatMessage, "role" | "content">[],
   project: ChatProjectContext | undefined,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  onAction?: (action: ChatAction) => void
 ): Promise<void> {
   const res = await fetch("/api/chat", {
     method: "POST",
@@ -98,10 +112,29 @@ export async function streamChatReply(
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  let buffer = "";
+
+  const handleLine = (line: string) => {
+    if (!line.trim()) return;
+    let event: { type: "text"; text: string } | ChatAction & { type: "action" };
+    try {
+      event = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (event.type === "text") onChunk(event.text);
+    else if (event.type === "action") onAction?.(event);
+  };
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    onChunk(decoder.decode(value, { stream: true }));
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+      handleLine(buffer.slice(0, newlineIndex));
+      buffer = buffer.slice(newlineIndex + 1);
+    }
   }
+  handleLine(buffer);
 }
